@@ -60,6 +60,7 @@ var TIME_STEP = 1 / 30;
 var SCREEN_WIDTH = 465;
 var SCREEN_HEIGHT = 465;
 var VIEW_ANGLE = 60;
+var TABLE_HIEGHT = 70;
 var N = 256;
 var Table_positon = 1000;
 var world, camera, scene, renderer, rendererElement, Mycanvas, axis, table, Table;
@@ -71,11 +72,13 @@ class kesigomuBox{
     constructor(body,color){
         this.kesigomu = body;
         this.color = color;
-        //まぎらわしいからx,zでやる
-        this.vx = this.kesigomu.rigidBody.position.x + 10;
-        this.vz = this.kesigomu.rigidBody.position.z ;
         this.angle = Math.PI/2;
+        this.v0 = 0;
+        //まぎらわしいからx,zでやる
+        this.vx = 0;
+        this.vz = 10;
         this.line = null;
+        this.cone = null;
     }
 
     init(){
@@ -83,8 +86,12 @@ class kesigomuBox{
     }
 
     move(){
+        this.v0 = this.v0 - 2 * (TIME_STEP);
         this.kesigomu.position.copy(this.kesigomu.rigidBody.position);
         this.kesigomu.quaternion.copy(this.kesigomu.rigidBody.quaternion);
+        if(this.v0 < 0){
+            //this.kesigomu.rigidBody.velocity.set(0,this.kesigomu.rigidBody.position.y,0);
+        }
     }
 
 }
@@ -123,9 +130,8 @@ function init() {
     scene.add(axis);
     camera = new THREE.PerspectiveCamera(VIEW_ANGLE, SCREEN_WIDTH / SCREEN_HEIGHT, 0.1, 1000);
     camera.position.x = 50;
-    camera.position.y = 80;
+    camera.position.y = 80 + TABLE_HIEGHT;
     camera.position.z = 55;
-    camera.lookAt(new THREE.Vector3(0, 10, 0));
     controls = new THREE.OrbitControls(camera,renderer.domElement);
 
     initLights();
@@ -165,9 +171,9 @@ function initGround() {
 
     // initialize Object3D
     var plane = createPlane(50, 50);
-    plane.rotation.x = -Math.PI / 2;
+    //plane.rotation.x = -Math.PI / 2;
     plane.position.y = 0;
-    //scene.add(plane);
+    scene.add(plane);
 }
 
 function createPlane(w, h) {
@@ -250,13 +256,13 @@ function createShapes() {
         }
     }
     */
-   createShape(0,50,0,1,0.7,2,10,0xFFFFFF);
-   createShape(0,50,5,1,0.7,2,10,0xFF0000);
+   createShape(0,50+TABLE_HIEGHT,0,1,0.7,2,10,0xFFFFFF);
+   createShape(0,50+TABLE_HIEGHT,5,1,0.7,2,10,0xFF0000);
 
 }
 
 function createtable(){
-    var geometry, material, shape, table_material;
+    var geometry, material, shape, table_material, Table_leg;
     let w = 25;
     let h = 1;
     let d = 25;
@@ -273,7 +279,7 @@ function createtable(){
     table.material = table_material;
     table.addShape(shape);
     table.position.x = 0;
-    table.position.y = 10;
+    table.position.y = TABLE_HIEGHT;
     table.position.z = 0;
     //table.quaternion.set(Math.random()/50, Math.random()/50, Math.random()/50, 0.2);
     world.add(table);
@@ -299,13 +305,26 @@ function createtable(){
     Table.rigidBody = table; // THREE.Object3D#rigidBody has a field of CANNON.RigidBody
     //Table.receiveShadow = true;
     scene.add(Table);
+
+    geometry = new THREE.BoxGeometry(2,TABLE_HIEGHT,2);
+    
+    let l = [[1,1],[1,-1],[-1,1],[-1,-1]]
+    for(let i=0;i<4;i++){
+        Table_leg = new THREE.Mesh(geometry,material);
+        Table_leg.position.x = 23*l[i][0];
+        Table_leg.position.y = TABLE_HIEGHT/2;
+        Table_leg.position.z = 23*l[i][1];
+        scene.add(Table_leg);
+    }
+
 }
 
 function drawangle(){
 
     Object.values(player_list).forEach((player) =>{
-        let material,geometry,Vx,Vz,line;
+        let material,geometry,Vx,Vz,line,cone;
         scene.remove(player.line);
+        scene.remove(player.cone);
         material = new THREE.LineBasicMaterial({color:0x800080,linewidth: 6});
         geometry = new THREE.Geometry();
         Vx = Math.cos(player.angle) * 4 + player.kesigomu.rigidBody.position.x;
@@ -317,6 +336,17 @@ function drawangle(){
         line = new THREE.Line(geometry,material);
         player.line = line;
         scene.add(line);
+
+        geometry = new THREE.ConeGeometry(0.4,1,20);
+        material = new THREE.MeshBasicMaterial({color:0x800080});
+        cone = new THREE.Mesh(geometry,material);
+        cone.position.x = Vx;
+        cone.position.y = player.kesigomu.rigidBody.position.y;
+        cone.position.z = Vz;
+        cone.rotation.x = Math.PI/2;
+        cone.rotation.z = player.angle - Math.PI/2;
+        player.cone = cone;
+        scene.add(cone)
     });
     
 }
@@ -335,10 +365,10 @@ function animate() {
         }
     })(scene);
     Table.position.x = 0;
-    Table.position.y = 10;
+    Table.position.y = TABLE_HIEGHT;
     Table.position.z = 0;
     Table.rigidBody.position.x = 0;
-    Table.rigidBody.position.y = 10;
+    Table.rigidBody.position.y = TABLE_HIEGHT;
     Table.rigidBody.position.z = 0;
 
     Object.values(player_list).forEach((player) =>{
@@ -348,6 +378,7 @@ function animate() {
     drawangle();
 
     // render graphical object
+    camera.lookAt(new THREE.Vector3(0,80,0));
     renderer.render(scene, camera);
     controls.update();
     // request next frame
@@ -359,10 +390,14 @@ $(document).on('keydown',(event)=>{
 
     //L
     if(event.keyCode===76){
+        
         Object.values(player_list).forEach((player) => {
             if(player.color === 0xFF0000){
-                player.angle
-                player.kesigomu.rigidBody.velocity.set(Vx,0,Vz);
+                player.v0 = 20;
+                player.vx = player.v0 * Math.cos(player.angle);
+                player.vz = player.v0 * Math.sin(player.angle);
+                console.log(player.vx + ':::' + player.vz);
+                player.kesigomu.rigidBody.velocity.set(player.vx,0,player.vz);
             }
         });
     }
@@ -371,7 +406,7 @@ $(document).on('keydown',(event)=>{
     if(event.keyCode===68){
         Object.values(player_list).forEach((player) => {
             if(player.color === 0xFF0000){
-                player.angle = player.angle + 0.1;
+                player.angle = player.angle + 0.05;
             }
         });
     }
@@ -379,7 +414,7 @@ $(document).on('keydown',(event)=>{
     if(event.keyCode===65){
         Object.values(player_list).forEach((player) => {
             if(player.color === 0xFF0000){
-                player.angle = player.angle - 0.1;
+                player.angle = player.angle - 0.05;
             }
         });
     }
